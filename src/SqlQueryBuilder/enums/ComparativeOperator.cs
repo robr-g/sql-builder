@@ -5,5 +5,6 @@ public enum ComparativeOperator
     GreaterThan,
     GreaterThanOrEqual,
     LessThan,
-    LessThanOrEqual
+    LessThanOrEqual,
+    Like
 }

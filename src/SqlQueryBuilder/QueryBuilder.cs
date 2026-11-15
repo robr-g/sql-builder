@@ -2,11 +2,16 @@ namespace SqlQueryBuilder;
 
 public class QueryBuilder
 {
-    required public Table Table { get; set; }
-    public List<Column>? Columns { get; set; }
-    public List<Join>? Joins { get; set; }
+    //select
+    public List<Column>? SelectColumns { get; set; } = new();
     required public bool SelectAll { get; set; }
 
+    //from
+    required public Table Table { get; set; }
+    public List<Join>? Joins { get; set; } = new();
+
+    //where
+    public WhereClause? Clause { get; set; }
 
     public string ToSql()
     {
@@ -19,18 +24,30 @@ public class QueryBuilder
         {
             select = $"SELECT *";
         }
-        else if (Columns != null)
+        else if (SelectColumns != null)
         {
             List<string> columns = new List<string>();
-            foreach (Column column in Columns)
+            foreach (Column column in SelectColumns)
             {
+                string selectColumn;
+            
                 switch (column.Alias)
                 {
                     case null:
-                        columns.Add($"{column.Name}");
+                        selectColumn = $"{column.Name}";
                         break;
                     default:
-                        columns.Add($"{column.Name} AS {column.Alias}");
+                        selectColumn = $"{column.Name} AS {column.Alias}";
+                        break;
+                }
+
+                switch (Joins)
+                {
+                    case null:
+                        columns.Add(selectColumn);
+                        break;
+                    default:
+                        columns.Add($"{column.Table.Alias}.{selectColumn}");
                         break;
                 }
             }
@@ -44,7 +61,7 @@ public class QueryBuilder
 
 
         //build the from tables
-        if (Joins == null)
+        if (Joins is null)
         {
             from = $"FROM {Table.Name}";
         }
@@ -60,7 +77,7 @@ public class QueryBuilder
                         joinType = "INNER JOIN";
                         break;
                     case JoinType.FullJoin:
-                        joinType = "OUTER JOIN";
+                        joinType = "FULL OUTER JOIN";
                         break;
                     case JoinType.LeftJoin:
                         joinType = "LEFT JOIN";
@@ -73,12 +90,19 @@ public class QueryBuilder
                         break;
                 }
 
-                joins.Add($"{joinType} {join.RightTable} {join.TableAlias} ON {Table.Alias}.{Table.IdColumn} = {join.TableAlias}.{join.JoinColumn}");
+                joins.Add($"{joinType} {join.RightTable.Name} {join.RightTable.Alias} ON {join.LeftTable.Alias}.{join.LeftJoinColumn} = {join.RightTable.Alias}.{join.RightJoinColumn}");
             }
             
-            from = $"FROM {Table.Name} {string.Join(" ", joins)}";
+            from = $"\nFROM {Table.Name} {Table.Alias}\n{string.Join("\n", joins)}";
         }   
 
-        return $"{select} {from} {where};";
+        //build where clause
+        if (Clause != null)
+        {
+            where = $"\nWHERE {Clause.GetClause()}";
+            return $"{select} {from} {where};";
+        }
+
+        return $"{select} {from};";
     }
 }
